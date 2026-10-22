@@ -10,3 +10,8 @@ zone "bea.test" {
      type master;
      file "/var/lib/bind/bea.test.dns";
 };
+
+zone "56.168.192.in-addr.arpa" {
+     type master;
+     file "/var/lib/bind/bea.test.rev";
+};

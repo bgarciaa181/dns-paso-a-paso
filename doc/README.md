@@ -61,6 +61,8 @@ OPTIONS="-u bind -4"
 
 ![default named](img/default-named.png)
 
+Al principio el fichero se copió vacío y Bind arrancaba sin las opciones (en `systemctl status named` salía solo `named -f`). Al corregirlo, arranca con `named -f -u bind -4`.
+
 ### 4.1. Fichero named.conf.options
 
 Antes de modificarlo hago una copia de seguridad:
@@ -125,3 +127,111 @@ Al comprobar la zona, `named-checkzone` me avisó de que el fichero no terminaba
 Después de corregirlo, la zona carga sin avisos y el servicio arranca bien:
 
 ![sin aviso](img/checkzone-directa.png)
+
+### 4.2. Fichero named.conf.local
+
+En este fichero declaro la zona `bea.test`. Indico que mi servidor DNS es el maestro de la zona y dónde estará su archivo de zona. Antes hago una copia de seguridad:
+
+```
+sudo cp /etc/bind/named.conf.local /etc/bind/named.conf.local.backup
+```
+
+```
+zone "bea.test" {
+     type master;
+     file "/var/lib/bind/bea.test.dns";
+};
+```
+
+### 4.3. Archivo de zona de resolución directa
+
+Creo el archivo de zona `/var/lib/bind/bea.test.dns`:
+
+```
+;
+; bea.test
+;
+$TTL    86400
+@       IN      SOA     debian.bea.test. admin.bea.test. (
+                        2026102301      ; Serial
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        86400 )         ; Negative Cache TTL
+;
+@                IN      NS      debian.bea.test.
+debian.bea.test. IN      A       192.168.56.10
+```
+
+![zona directa](img/zona-directa.png)
+
+El registro SOA da los datos de la zona autoritativa, el NS indica el servidor DNS de la zona y el A asocia el nombre `debian.bea.test` a su IP. El serial usa el formato AñoMesDíaVersión.
+
+Al comprobar la zona, `named-checkzone` me avisó de que el fichero no terminaba con un salto de línea (`file does not end with newline`). No es un error y la zona cargaba, pero lo corregí añadiendo una línea final al fichero:
+
+![aviso](img/checkzone-directa-aviso.png)
+
+Después de corregirlo, la zona carga sin avisos y el servicio arranca bien:
+
+![sin aviso](img/checkzone-directa.png)
+
+### 4.4. Zona para la resolución inversa
+
+Añado la zona inversa en `named.conf.local`. Su nombre es el tercer byte de mi red al revés, 56.168.192.in-addr.arpa:
+
+```
+zone "56.168.192.in-addr.arpa" {
+     type master;
+     file "/var/lib/bind/bea.test.rev";
+};
+```
+
+Al reiniciar Bind, el servicio no arrancó. El registro indicaba que la zona `bea.test` estaba definida dos veces en `named.conf.local`: al añadir la zona inversa había dejado el nombre de la zona directa en la segunda declaración.
+
+![error zona duplicada](img/error-zona-duplicada.png)
+
+Corregí el nombre de la segunda zona y el servicio arrancó. El fichero queda con las dos zonas:
+
+![named.conf.local](img/named-conf-local.png)
+
+Creo el archivo de zona inversa `/var/lib/bind/bea.test.rev`. El registro PTR asocia el último octeto de la IP (10) con el nombre del servidor:
+
+```
+;
+; 56.168.192
+;
+$TTL    86400
+@       IN      SOA     debian.bea.test. admin.bea.test. (
+                        2026102301      ; Serial
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        86400 )         ; Negative Cache TTL
+;
+@       IN      NS      debian.bea.test.
+10      IN      PTR     debian.bea.test.
+```
+
+![zona inversa](img/zona-inversa.png)
+
+### 4.5. Comprobación de las configuraciones
+
+Compruebo las dos zonas, reinicio el servicio y miro su estado:
+
+```
+named-checkzone bea.test. /var/lib/bind/bea.test.dns
+named-checkzone 56.168.192.in-addr.arpa. /var/lib/bind/bea.test.rev
+sudo named-checkconf
+sudo systemctl restart named
+systemctl status named
+```
+
+![comprobacion zonas](img/checkzone-inversa.png)
+
+En el registro de Bind se ve que las dos zonas se han cargado con el serial 2026102301:
+
+```
+sudo journalctl -u named -n 20 --no-pager
+```
+
+![log zonas](img/log-zonas.png)
