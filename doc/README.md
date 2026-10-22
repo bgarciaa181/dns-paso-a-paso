@@ -48,3 +48,72 @@ systemctl status named
 ```
 
 ![status](img/status.png)
+
+## 4. Configuración del servidor
+
+### Solo IPv4
+
+En clase solo vamos a usar IPv4, así que se lo indico a Bind en `/etc/default/named`:
+
+```
+OPTIONS="-u bind -4"
+```
+
+![default named](img/default-named.png)
+
+### 4.1. Fichero named.conf.options
+
+Antes de modificarlo hago una copia de seguridad:
+
+```
+sudo cp /etc/bind/named.conf.options /etc/bind/named.conf.options.backup
+```
+
+Añado una lista de acceso (`confiables`) para que solo puedan hacer consultas recursivas los hosts de confianza: el propio servidor y la red 192.168.56.0/24. El fichero queda así:
+
+```
+acl confiables {
+    127.0.0.1;
+    192.168.56.0/24;
+};
+
+options {
+        directory "/var/cache/bind";
+
+        // forwarders {
+        //   0.0.0.0;
+        // };
+
+        allow-transfer { none; };
+
+        listen-on port 53 { 127.0.0.1; 192.168.56.10; };
+
+        recursion yes;
+        allow-recursion { confiables; };
+
+        dnssec-validation yes;
+
+        // listen-on-v6 { any; };
+};
+```
+
+![named.conf.options](img/named-conf-options.png)
+
+Qué hace cada parte:
+
+- `directory`: es donde Bind guarda la caché (/var/cache/bind). Por defecto ya funciona como DNS caché.
+- `allow-transfer { none; }`: no se permite transferir zonas a nadie, de momento.
+- `listen-on port 53`: el servidor escucha en el puerto 53 en localhost y en la IP de su tarjeta de red privada.
+- `recursion yes` y `allow-recursion { confiables; }`: permito consultas recursivas, pero solo a los hosts de la lista de acceso.
+- `dnssec-validation yes`: activa la validación de DNSSEC.
+- `listen-on-v6` está comentada porque no vamos a responder consultas IPv6.
+
+Compruebo que la configuración es correcta, reinicio el servicio y miro su estado:
+
+```
+named-checkconf /etc/bind/named.conf.options
+sudo systemctl restart named
+systemctl status named
+```
+
+![comprobacion](img/checkconf-status.png)
