@@ -9,7 +9,7 @@ Tiene una tarjeta de red privada en la red 192.168.56.0/24 y su IP es 192.168.56
 vagrant up servidor
 ```
 
-![vagrant up](img/01-vagrant-up.png)
+![vagrant up](img/vagrant-up.png)
 
 Entro en la máquina y compruebo su IP:
 
@@ -18,7 +18,7 @@ vagrant ssh servidor
 ip a
 ```
 
-![ip a](img/02-ip-a.png)
+![ip a](img/ip-a.png)
 
 ## 2. Comprobación del fichero hosts
 
@@ -28,4 +28,4 @@ Antes de empezar compruebo que el fichero hosts de mi equipo no tiene entradas a
 Get-Content C:\Windows\System32\drivers\etc\hosts
 ```
 
-![hosts](img/03-hosts.png)
+![hosts](img/hosts.png)
