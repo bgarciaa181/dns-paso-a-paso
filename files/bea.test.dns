@@ -3,7 +3,7 @@
 ;
 $TTL    86400
 @       IN      SOA     debian.bea.test. admin.bea.test. (
-                        2026102301      ; Serial
+                        2026102302      ; Serial
                         3600            ; Refresh
                         1800            ; Retry
                         604800          ; Expire
@@ -11,3 +11,5 @@ $TTL    86400
 ;
 @                IN      NS      debian.bea.test.
 debian.bea.test. IN      A       192.168.56.10
+web.bea.test.    IN      CNAME   debian.bea.test.
+@                IN      TXT     "bgarciaa181"
