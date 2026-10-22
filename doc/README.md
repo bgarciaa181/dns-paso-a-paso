@@ -235,3 +235,39 @@ sudo journalctl -u named -n 20 --no-pager
 ```
 
 ![log zonas](img/log-zonas.png)
+
+### 4.6. Comprobación de las resoluciones y de las consultas
+
+Compruebo desde un cliente, con `dig` y `nslookup`, las resoluciones. Para que la máquina de pruebas use mi servidor como DNS principal, cambio su configuración de red:
+
+```
+echo "nameserver 192.168.56.10" | sudo tee /etc/resolv.conf
+cat /etc/resolv.conf
+dig debian.bea.test
+```
+
+![cliente dns](img/cliente-dns.png)
+
+## 5. Comprobación usando dig
+
+Pregunto directamente al servidor:
+
+```
+dig @192.168.56.10 debian.bea.test
+```
+
+![dig](img/dig.png)
+
+El estado es `NOERROR`, aparece el flag `aa` porque mi servidor es autoritativo de la zona, en la sección ANSWER sale el registro A con la IP 192.168.56.10 y el servidor que responde es 192.168.56.10.
+
+## 6. Comprobación usando nslookup
+
+```
+nslookup debian.bea.test 192.168.56.10
+```
+
+![nslookup](img/nslookup.png)
+
+También lo compruebo desde mi equipo anfitrión:
+
+![nslookup desde el pc](img/nslookup-pc.png)
