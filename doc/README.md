@@ -328,3 +328,28 @@ dig @192.168.56.10 www.google.es | grep flags
 ![aa](img/aa.png)
 
 El flag `aa` aparece con mi dominio porque mi servidor es el maestro de la zona `bea.test` y responde con autoridad, y no aparece con `www.google.es` porque mi servidor solo resuelve esa consulta de forma recursiva con datos de otros servidores.
+
+### 7.2. Script de autocomprobación (test.sh)
+
+Creo el script `test.sh` en el directorio raíz del repositorio, con permisos de ejecución, para automatizar la verificación del servidor. Comprueba la sintaxis de los ficheros de configuración y las zonas, y hace consultas de resolución. Más adelante lo ejecutará el último script de provisión de Vagrant.
+
+```
+#!/usr/bin/env bash
+echo "=== 1. Comprobación de sintaxis de ficheros ==="
+named-checkconf /etc/bind/named.conf.options && echo "[OK] named.conf.options"
+named-checkzone bea.test /var/lib/bind/bea.test.dns && echo "[OK] Zona directa"
+named-checkzone 56.168.192.in-addr.arpa /var/lib/bind/bea.test.rev && echo "[OK] Zona inversa"
+
+echo "=== 2. Comprobación de resolución ==="
+dig @localhost web.bea.test CNAME +short
+dig @localhost bea.test TXT +short
+dig @localhost -x 192.168.56.10 +short
+```
+
+Lo ejecuto dentro de la máquina:
+
+```
+bash /vagrant/test.sh
+```
+
+![test.sh](img/test-sh.png)
