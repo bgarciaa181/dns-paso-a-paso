@@ -271,3 +271,60 @@ nslookup debian.bea.test 192.168.56.10
 También lo compruebo desde mi equipo anfitrión:
 
 ![nslookup desde el pc](img/nslookup-pc.png)
+
+## 7. Tareas de ampliación y comprobación
+
+### 7.1. Ampliación de registros en la zona
+
+Añado a la zona un alias y un registro de texto, y subo el serial a 2026102302 para indicar que la zona ha cambiado:
+
+```
+web.bea.test.    IN      CNAME   debian.bea.test.
+@                IN      TXT     "bgarciaa181"
+```
+
+#### 7.1.1. Registro CNAME
+
+El alias `web.bea.test` apunta al nombre canónico `debian.bea.test`:
+
+```
+dig @192.168.56.10 web.bea.test CNAME +short
+nslookup -type=cname web.bea.test 192.168.56.10
+```
+
+![cname](img/cname.png)
+
+#### 7.1.2. Registro descriptivo TXT
+
+Añado en la raíz de la zona un registro TXT con mi usuario de GitHub:
+
+```
+dig @192.168.56.10 bea.test TXT +short
+nslookup -type=txt bea.test 192.168.56.10
+```
+
+![txt](img/txt.png)
+
+#### 7.1.3. Registro de resolución inversa PTR
+
+Compruebo que la IP del servidor resuelve a su nombre de dominio completo:
+
+```
+dig @192.168.56.10 -x 192.168.56.10 +short
+nslookup 192.168.56.10 192.168.56.10
+```
+
+![ptr](img/ptr.png)
+
+#### 7.1.4. Comprobación de autoridad (flag aa)
+
+Consulto mi dominio local y un dominio externo:
+
+```
+dig @192.168.56.10 debian.bea.test | grep flags
+dig @192.168.56.10 www.google.es | grep flags
+```
+
+![aa](img/aa.png)
+
+El flag `aa` aparece con mi dominio porque mi servidor es el maestro de la zona `bea.test` y responde con autoridad, y no aparece con `www.google.es` porque mi servidor solo resuelve esa consulta de forma recursiva con datos de otros servidores.
