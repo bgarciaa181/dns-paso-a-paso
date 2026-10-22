@@ -1,0 +1,13 @@
+;
+; bea.test
+;
+$TTL    86400
+@       IN      SOA     debian.bea.test. admin.bea.test. (
+                        2026102301      ; Serial
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        86400 )         ; Negative Cache TTL
+;
+@                IN      NS      debian.bea.test.
+debian.bea.test. IN      A       192.168.56.10

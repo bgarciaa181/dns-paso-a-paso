@@ -117,3 +117,11 @@ systemctl status named
 ```
 
 ![comprobacion](img/checkconf-status.png)
+
+Al comprobar la zona, `named-checkzone` me avisó de que el fichero no terminaba con un salto de línea (`file does not end with newline`). No es un error y la zona cargaba, pero lo corregí añadiendo una línea final al fichero:
+
+![aviso](img/checkzone-directa-aviso.png)
+
+Después de corregirlo, la zona carga sin avisos y el servicio arranca bien:
+
+![sin aviso](img/checkzone-directa.png)
