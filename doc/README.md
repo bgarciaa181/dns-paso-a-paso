@@ -133,9 +133,24 @@ systemctl status named
 
 ![comprobacion](img/checkconf-status.png)
 
-### 4.3. Archivo de zona de resolución directa
+### 4.2. File named.conf.local
 
-Creo el archivo de zona `/var/lib/bind/bea.test.dns`:
+In this file I declare the zone `bea.test`. I say that my DNS server is the master of the zone, and where the zone file is. Before I change the file, I make a backup copy:
+
+```
+sudo cp /etc/bind/named.conf.local /etc/bind/named.conf.local.backup
+```
+
+```
+zone "bea.test" {
+     type master;
+     file "/var/lib/bind/bea.test.dns";
+};
+```
+
+### 4.3. Forward zone file
+
+I create the zone file `/var/lib/bind/bea.test.dns`:
 
 ```
 ;
@@ -155,19 +170,19 @@ debian.bea.test. IN      A       192.168.56.10
 
 ![zona directa](img/zona-directa.png)
 
-El registro SOA da los datos de la zona autoritativa, el NS indica el servidor DNS de la zona y el A asocia el nombre `debian.bea.test` a su IP. El serial usa el formato AñoMesDíaVersión.
+The SOA record gives information about the zone. The NS record says which DNS server answers for the zone. The A record connects the name `debian.bea.test` with its IP. For the serial number I use the format YearMonthDayVersion.
 
-Al comprobar la zona, `named-checkzone` me avisó de que el fichero no terminaba con un salto de línea (`file does not end with newline`). No es un error y la zona cargaba, pero lo corregí añadiendo una línea final al fichero:
+When I checked the zone, `named-checkzone` showed a warning: the file did not end with a new line (`file does not end with newline`). It is not an error and the zone loaded, but I fixed it by adding an empty line at the end of the file:
 
-![aviso](img/checkzone-directa-aviso.png)
+![warning](img/checkzone-directa-aviso.png)
 
-Después de corregirlo, la zona carga sin avisos y el servicio arranca bien:
+After the fix, the zone loads without warnings and the service starts well:
 
-![sin aviso](img/checkzone-directa.png)
+![no warning](img/checkzone-directa.png)
 
-### 4.4. Zona para la resolución inversa
+### 4.4. Reverse zone
 
-Añado la zona inversa en `named.conf.local`. Su nombre es el tercer byte de mi red al revés, 56.168.192.in-addr.arpa:
+I add the reverse zone in `named.conf.local`. Its name is the third number of my network, and then the rest in reverse order: 56.168.192.in-addr.arpa.
 
 ```
 zone "56.168.192.in-addr.arpa" {
@@ -176,15 +191,15 @@ zone "56.168.192.in-addr.arpa" {
 };
 ```
 
-Al reiniciar Bind, el servicio no arrancó. El registro indicaba que la zona `bea.test` estaba definida dos veces en `named.conf.local`: al añadir la zona inversa había dejado el nombre de la zona directa en la segunda declaración.
+When I restarted Bind, the service did not start. The log said that the zone `bea.test` was defined two times in `named.conf.local`. When I added the reverse zone, I left the name of the forward zone in the second block.
 
-![error zona duplicada](img/error-zona-duplicada.png)
+![duplicated zone error](img/error-zona-duplicada.png)
 
-Corregí el nombre de la segunda zona y el servicio arrancó. El fichero queda con las dos zonas:
+I fixed the name of the second zone and the service started. Now the file has the two zones:
 
 ![named.conf.local](img/named-conf-local.png)
 
-Creo el archivo de zona inversa `/var/lib/bind/bea.test.rev`. El registro PTR asocia el último octeto de la IP (10) con el nombre del servidor:
+Then I create the reverse zone file `/var/lib/bind/bea.test.rev`. The PTR record connects the last number of the IP (10) with the name of the server:
 
 ```
 ;
@@ -204,9 +219,9 @@ $TTL    86400
 
 ![zona inversa](img/zona-inversa.png)
 
-### 4.5. Comprobación de las configuraciones
+### 4.5. Checking the configuration
 
-Compruebo las dos zonas, reinicio el servicio y miro su estado:
+I check the two zones, restart the service and look at its state:
 
 ```
 named-checkzone bea.test. /var/lib/bind/bea.test.dns
@@ -218,7 +233,7 @@ systemctl status named
 
 ![comprobacion zonas](img/checkzone-inversa.png)
 
-En el registro de Bind se ve que las dos zonas se han cargado con el serial 2026102301:
+In the Bind log I can see that the two zones were loaded with the serial number 2026102301:
 
 ```
 sudo journalctl -u named -n 20 --no-pager
@@ -226,9 +241,9 @@ sudo journalctl -u named -n 20 --no-pager
 
 ![log zonas](img/log-zonas.png)
 
-### 4.6. Comprobación de las resoluciones y de las consultas
+### 4.6. Checking the answers
 
-Compruebo desde un cliente, con `dig` y `nslookup`, las resoluciones. Para que la máquina de pruebas use mi servidor como DNS principal, cambio su configuración de red:
+I check the answers from a client with `dig` and `nslookup`. I want the test machine to use my server as its main DNS, so I change its network configuration:
 
 ```
 echo "nameserver 192.168.56.10" | sudo tee /etc/resolv.conf
@@ -238,9 +253,9 @@ dig debian.bea.test
 
 ![cliente dns](img/cliente-dns.png)
 
-## 5. Comprobación usando dig
+## 5. Checking with dig
 
-Pregunto directamente al servidor:
+I ask the server directly:
 
 ```
 dig @192.168.56.10 debian.bea.test
@@ -248,9 +263,9 @@ dig @192.168.56.10 debian.bea.test
 
 ![dig](img/dig.png)
 
-El estado es `NOERROR`, aparece el flag `aa` porque mi servidor es autoritativo de la zona, en la sección ANSWER sale el registro A con la IP 192.168.56.10 y el servidor que responde es 192.168.56.10.
+The status is `NOERROR`. The flag `aa` appears because my server is authoritative for the zone, which means it has the original data. In the ANSWER section there is the A record with the IP 192.168.56.10, and the server that answered is 192.168.56.10.
 
-## 6. Comprobación usando nslookup
+## 6. Checking with nslookup
 
 ```
 nslookup debian.bea.test 192.168.56.10
@@ -258,9 +273,9 @@ nslookup debian.bea.test 192.168.56.10
 
 ![nslookup](img/nslookup.png)
 
-También lo compruebo desde mi equipo anfitrión:
+I also check it from my own computer:
 
-![nslookup desde el pc](img/nslookup-pc.png)
+![nslookup from the pc](img/nslookup-pc.png)
 
 ## 7. Tareas de ampliación y comprobación
 
