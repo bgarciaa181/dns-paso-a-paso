@@ -4,6 +4,19 @@
 
 Creo el Vagrantfile con la máquina del servidor.
 Tiene una tarjeta de red privada en la red 192.168.56.0/24 y su IP es 192.168.56.10.
+Uso la box de Debian `debian/bookworm64`. El Vagrantfile queda así:
+
+```ruby
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/bookworm64"
+
+  config.vm.define "servidor" do |srv|
+    srv.vm.network "private_network", ip: "192.168.56.10"
+  end
+end
+```
+
+Arranco la máquina:
 
 ```
 vagrant up servidor
@@ -119,14 +132,6 @@ systemctl status named
 ```
 
 ![comprobacion](img/checkconf-status.png)
-
-Al comprobar la zona, `named-checkzone` me avisó de que el fichero no terminaba con un salto de línea (`file does not end with newline`). No es un error y la zona cargaba, pero lo corregí añadiendo una línea final al fichero:
-
-![aviso](img/checkzone-directa-aviso.png)
-
-Después de corregirlo, la zona carga sin avisos y el servicio arranca bien:
-
-![sin aviso](img/checkzone-directa.png)
 
 ### 4.2. Fichero named.conf.local
 
@@ -278,7 +283,22 @@ También lo compruebo desde mi equipo anfitrión:
 
 Añado a la zona un alias y un registro de texto, y subo el serial a 2026102302 para indicar que la zona ha cambiado:
 
+La zona completa queda así:
+
 ```
+;
+; bea.test
+;
+$TTL    86400
+@       IN      SOA     debian.bea.test. admin.bea.test. (
+                        2026102302      ; Serial
+                        3600            ; Refresh
+                        1800            ; Retry
+                        604800          ; Expire
+                        86400 )         ; Negative Cache TTL
+;
+@                IN      NS      debian.bea.test.
+debian.bea.test. IN      A       192.168.56.10
 web.bea.test.    IN      CNAME   debian.bea.test.
 @                IN      TXT     "bgarciaa181"
 ```
@@ -353,3 +373,98 @@ bash /vagrant/test.sh
 ```
 
 ![test.sh](img/test-sh.png)
+
+## Despliegue automático con Vagrant
+
+Para que la práctica se despliegue sola, preparo dos scripts de provisión en la carpeta `config/`. Los ficheros de configuración los guardo en `files/` y los scripts los copian a su sitio dentro de la máquina, porque la carpeta del proyecto se comparte con la VM en `/vagrant`.
+
+`config/provision-servidor.sh` instala Bind, copia los ficheros de configuración y reinicia el servicio:
+
+```
+#!/usr/bin/env bash
+apt-get update
+apt-get install -y bind9 bind9utils bind9-doc dnsutils
+cp /vagrant/files/named /etc/default/named
+cp /vagrant/files/named.conf.options /etc/bind/named.conf.options
+cp /vagrant/files/named.conf.local /etc/bind/named.conf.local
+cp /vagrant/files/bea.test.dns /var/lib/bind/bea.test.dns
+cp /vagrant/files/bea.test.rev /var/lib/bind/bea.test.rev
+systemctl restart named
+```
+
+`config/test-final.sh` es la última provisión y lanza el script de pruebas:
+
+```
+#!/usr/bin/env bash
+bash /vagrant/test.sh
+```
+
+Destruyo la máquina y la vuelvo a crear para comprobar que todo funciona de forma automática:
+
+```
+vagrant destroy servidor -f
+vagrant up servidor
+```
+
+![vagrant provision](img/vagrant-provision.png)
+
+## 8. Servidor secundario
+
+Añado una segunda máquina virtual que recibirá una copia de las zonas desde el primario. El primario tiene la IP 192.168.56.10 y al secundario le asigno la siguiente, 192.168.56.11.
+
+### 8.1. Crear la segunda máquina virtual
+
+Añado la máquina `secundario` al Vagrantfile:
+
+```ruby
+config.vm.define "secundario" do |sec|
+  sec.vm.network "private_network", ip: "192.168.56.11"
+end
+```
+
+```
+vagrant up secundario
+vagrant ssh secundario
+ip a
+```
+
+![ip secundario](img/ip-a-secundario.png)
+
+### 8.2. Permitir transferencias en el servidor primario
+
+En `named.conf.local` del primario autorizo la IP del secundario en cada zona. Así solo ese servidor puede pedir la transferencia:
+
+```
+zone "bea.test" {
+     type master;
+     file "/var/lib/bind/bea.test.dns";
+     allow-transfer { 192.168.56.11; };
+};
+
+zone "56.168.192.in-addr.arpa" {
+     type master;
+     file "/var/lib/bind/bea.test.rev";
+     allow-transfer { 192.168.56.11; };
+};
+```
+
+![allow-transfer](img/primario-allow-transfer.png)
+
+Compruebo la configuración y reinicio Bind en el primario:
+
+```
+sudo named-checkconf
+sudo systemctl restart named
+systemctl status named
+```
+
+![reinicio primario](img/primario-restart.png)
+
+### 8.3. Instalar BIND en el servidor secundario
+
+```
+sudo apt update
+sudo apt install -y bind9 bind9-utils dnsutils
+```
+
+![instalacion secundario](img/instalacion-secundario.png)
