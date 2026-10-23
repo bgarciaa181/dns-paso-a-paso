@@ -9,5 +9,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define "secundario" do |sec|
     sec.vm.network "private_network", ip: "192.168.56.11"
+    sec.vm.provision "shell", path: "config/provision-secundario.sh"
   end
 end
+
