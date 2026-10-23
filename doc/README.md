@@ -379,11 +379,11 @@ bash /vagrant/test.sh
 
 ![test.sh](img/test-sh.png)
 
-## Despliegue automático con Vagrant
+## Automatic deployment with Vagrant
 
-Para que la práctica se despliegue sola, preparo dos scripts de provisión en la carpeta `config/`. Los ficheros de configuración los guardo en `files/` y los scripts los copian a su sitio dentro de la máquina, porque la carpeta del proyecto se comparte con la VM en `/vagrant`.
+I want the project to start by itself, so I prepare two provision scripts in the folder `config/`. I keep the configuration files in `files/`, and the scripts copy them to the right place inside the machine. This works because the project folder is shared with the virtual machine in `/vagrant`.
 
-`config/provision-servidor.sh` instala Bind, copia los ficheros de configuración y reinicia el servicio:
+`config/provision-servidor.sh` installs Bind, copies the configuration files and restarts the service:
 
 ```
 #!/usr/bin/env bash
@@ -397,14 +397,14 @@ cp /vagrant/files/bea.test.rev /var/lib/bind/bea.test.rev
 systemctl restart named
 ```
 
-`config/test-final.sh` es la última provisión y lanza el script de pruebas:
+`config/test-final.sh` is the last provision script. It runs my check script:
 
 ```
 #!/usr/bin/env bash
 bash /vagrant/test.sh
 ```
 
-Destruyo la máquina y la vuelvo a crear para comprobar que todo funciona de forma automática:
+To check that everything works by itself, I destroy the machine and create it again:
 
 ```
 vagrant destroy servidor -f
@@ -413,13 +413,13 @@ vagrant up servidor
 
 ![vagrant provision](img/vagrant-provision.png)
 
-## 8. Servidor secundario
+## 8. Second server (secondary)
 
-Añado una segunda máquina virtual que recibirá una copia de las zonas desde el primario. El primario tiene la IP 192.168.56.10 y al secundario le asigno la siguiente, 192.168.56.11.
+I add a second virtual machine. It gets a copy of the zones from the first server. The first server has the IP 192.168.56.10, and I give the next IP to the second one: 192.168.56.11.
 
-### 8.1. Crear la segunda máquina virtual
+### 8.1. Creating the second virtual machine
 
-Añado la máquina `secundario` al Vagrantfile:
+I add the machine `secundario` to the Vagrantfile:
 
 ```ruby
 config.vm.define "secundario" do |sec|
@@ -435,9 +435,9 @@ ip a
 
 ![ip secundario](img/ip-a-secundario.png)
 
-### 8.2. Permitir transferencias en el servidor primario
+### 8.2. Allowing zone transfers in the primary server
 
-En `named.conf.local` del primario autorizo la IP del secundario en cada zona. Así solo ese servidor puede pedir la transferencia:
+In `named.conf.local` of the primary server, I write the IP of the secondary server in each zone. This way, only that server can ask for a copy of the zones:
 
 ```
 zone "bea.test" {
@@ -455,7 +455,7 @@ zone "56.168.192.in-addr.arpa" {
 
 ![allow-transfer](img/primario-allow-transfer.png)
 
-Compruebo la configuración y reinicio Bind en el primario:
+I check the configuration and restart Bind in the primary server:
 
 ```
 sudo named-checkconf
@@ -463,20 +463,20 @@ sudo systemctl restart named
 systemctl status named
 ```
 
-![reinicio primario](img/primario-restart.png)
+![primary restart](img/primario-restart.png)
 
-### 8.3. Instalar BIND en el servidor secundario
+### 8.3. Installing Bind in the secondary server
 
 ```
 sudo apt update
 sudo apt install -y bind9 bind9-utils dnsutils
 ```
 
-![instalacion secundario](img/instalacion-secundario.png)
+![secondary installation](img/instalacion-secundario.png)
 
-### 8.4. Configurar las ACL del secundario
+### 8.4. Access list of the secondary server
 
-En `named.conf.options` del secundario uso la misma lista de hosts confiables que en el primario, y cambio la IP de escucha por la propia del secundario:
+In `named.conf.options` of the secondary server I use the same list of trusted computers as in the primary server. I only change the listening IP to the IP of the secondary server:
 
 ```
 acl confiables {
@@ -494,11 +494,11 @@ options {
 };
 ```
 
-![options secundario](img/secundario-options.png)
+![secondary options](img/secundario-options.png)
 
-### 8.5. Declarar las zonas esclavas
+### 8.5. Declaring the slave zones
 
-En `named.conf.local` del secundario declaro las dos zonas como esclavas e indico la IP del primario en `masters`. No creo los ficheros de zona: el primario los transfiere y Bind los guarda en `/var/cache/bind`.
+In `named.conf.local` of the secondary server I declare the two zones as slave zones, and I write the IP of the primary server in `masters`. I do not create the zone files here. The primary server sends them, and Bind saves them in `/var/cache/bind`.
 
 ```
 zone "bea.test" {
@@ -514,9 +514,9 @@ zone "56.168.192.in-addr.arpa" {
 };
 ```
 
-![local secundario](img/secundario-local.png)
+![secondary local](img/secundario-local.png)
 
-Valido la configuración y reinicio el servicio:
+I check the configuration and restart the service:
 
 ```
 sudo named-checkconf
@@ -524,19 +524,19 @@ sudo systemctl restart named
 systemctl status named
 ```
 
-![reinicio secundario](img/secundario-restart.png)
+![secondary restart](img/secundario-restart.png)
 
-### 8.6. Comprobar la transferencia y la resolución
+### 8.6. Checking the transfer and the answers
 
-En el registro del secundario se ve que las dos zonas se han transferido correctamente:
+In the log of the secondary server I can see that the two zones were transferred correctly:
 
 ```
 sudo journalctl -u named --since "10 minutes ago" --no-pager | grep -i transfer
 ```
 
-![log secundario](img/secundario-log.png)
+![secondary log](img/secundario-log.png)
 
-Desde el primario, que hace de cliente, consulto directamente al secundario:
+From the primary server, which works as a client, I ask the secondary server directly:
 
 ```
 dig @192.168.56.11 bea.test SOA +norecurse
@@ -544,9 +544,9 @@ dig @192.168.56.11 debian.bea.test A +short
 dig @192.168.56.11 -x 192.168.56.10 +short
 ```
 
-![dig secundario](img/secundario-dig.png)
+![secondary dig](img/secundario-dig.png)
 
-La consulta SOA devuelve respuesta autoritativa (`aa`) y las consultas directa e inversa devuelven los registros configurados. Compruebo que el número de serie es el mismo en los dos servidores:
+The SOA answer has the flag `aa`, so the secondary server answers with authority. The forward and the reverse questions give the right records. Then I check that both servers have the same serial number:
 
 ```
 dig @192.168.56.10 bea.test SOA +short
@@ -555,9 +555,9 @@ dig @192.168.56.11 bea.test SOA +short
 
 ![serial](img/serial.png)
 
-## Despliegue automático de las dos máquinas
+## Automatic deployment of the two machines
 
-Para que también el servidor secundario se despliegue solo, creo `config/provision-secundario.sh`, que instala Bind, copia los ficheros de configuración de `files/secundario/` y reinicia el servicio. Al final hace dos consultas para comprobar que los dos servidores tienen el mismo serial:
+I also want the secondary server to start by itself. I create `config/provision-secundario.sh`. It installs Bind, copies the files from `files/secundario/` and restarts the service. At the end it asks both servers for the SOA record, to show that they have the same serial number:
 
 ```
 #!/usr/bin/env bash
@@ -572,7 +572,7 @@ dig @192.168.56.10 bea.test SOA +short
 dig @192.168.56.11 bea.test SOA +short
 ```
 
-El Vagrantfile definitivo define las dos máquinas. El secundario va después del primario, porque necesita que el primario esté funcionando para recibir las zonas:
+The final Vagrantfile has the two machines. The secondary machine goes after the primary one, because it needs the primary server to be running to get the zones:
 
 ```ruby
 Vagrant.configure("2") do |config|
@@ -591,17 +591,17 @@ Vagrant.configure("2") do |config|
 end
 ```
 
-Destruyo las dos máquinas y las vuelvo a crear desde cero para comprobar que todo funciona de forma automática:
+I destroy the two machines and create them again from zero, to check that everything works by itself:
 
 ```
 vagrant destroy -f
 vagrant up
 ```
 
-Al terminar, el servidor ejecuta el script de pruebas y todo sale correcto:
+At the end, the first machine runs the check script and everything is correct:
 
 ![up servidor](img/up-servidor.png)
 
-Y el secundario muestra el mismo serial que el primario, así que la transferencia de zonas ha funcionado:
+The second machine shows the same serial number as the first one, so the zone transfer works:
 
 ![up secundario](img/up-secundario.png)
