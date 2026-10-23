@@ -549,3 +549,54 @@ dig @192.168.56.11 bea.test SOA +short
 ```
 
 ![serial](img/serial.png)
+
+## Despliegue automático de las dos máquinas
+
+Para que también el servidor secundario se despliegue solo, creo `config/provision-secundario.sh`, que instala Bind, copia los ficheros de configuración de `files/secundario/` y reinicia el servicio. Al final hace dos consultas para comprobar que los dos servidores tienen el mismo serial:
+
+```
+#!/usr/bin/env bash
+apt-get update
+apt-get install -y bind9 bind9-utils dnsutils
+cp /vagrant/files/named /etc/default/named
+cp /vagrant/files/secundario/named.conf.options /etc/bind/named.conf.options
+cp /vagrant/files/secundario/named.conf.local /etc/bind/named.conf.local
+systemctl restart named
+sleep 5
+dig @192.168.56.10 bea.test SOA +short
+dig @192.168.56.11 bea.test SOA +short
+```
+
+El Vagrantfile definitivo define las dos máquinas. El secundario va después del primario, porque necesita que el primario esté funcionando para recibir las zonas:
+
+```ruby
+Vagrant.configure("2") do |config|
+  config.vm.box = "debian/bookworm64"
+
+  config.vm.define "servidor" do |srv|
+    srv.vm.network "private_network", ip: "192.168.56.10"
+    srv.vm.provision "shell", path: "config/provision-servidor.sh"
+    srv.vm.provision "shell", path: "config/test-final.sh"
+  end
+
+  config.vm.define "secundario" do |sec|
+    sec.vm.network "private_network", ip: "192.168.56.11"
+    sec.vm.provision "shell", path: "config/provision-secundario.sh"
+  end
+end
+```
+
+Destruyo las dos máquinas y las vuelvo a crear desde cero para comprobar que todo funciona de forma automática:
+
+```
+vagrant destroy -f
+vagrant up
+```
+
+Al terminar, el servidor ejecuta el script de pruebas y todo sale correcto:
+
+![up servidor](img/up-servidor.png)
+
+Y el secundario muestra el mismo serial que el primario, así que la transferencia de zonas ha funcionado:
+
+![up secundario](img/up-secundario.png)
