@@ -1,0 +1,13 @@
+zone "bea.test" {
+  type slave;
+  masters { 192.168.56.10; };
+  file "/var/cache/bind/bea.test.dns";
+};
+
+zone "56.168.192.in-addr.arpa" {
+  type slave;
+  masters { 192.168.56.10; };
+  file "/var/cache/bind/bea.test.rev";
+};
+
+
