@@ -468,3 +468,84 @@ sudo apt install -y bind9 bind9-utils dnsutils
 ```
 
 ![instalacion secundario](img/instalacion-secundario.png)
+
+### 8.4. Configurar las ACL del secundario
+
+En `named.conf.options` del secundario uso la misma lista de hosts confiables que en el primario, y cambio la IP de escucha por la propia del secundario:
+
+```
+acl confiables {
+    127.0.0.1;
+    192.168.56.0/24;
+};
+
+options {
+        directory "/var/cache/bind";
+        allow-transfer { none; };
+        listen-on port 53 { 127.0.0.1; 192.168.56.11; };
+        recursion yes;
+        allow-recursion { confiables; };
+        dnssec-validation yes;
+};
+```
+
+![options secundario](img/secundario-options.png)
+
+### 8.5. Declarar las zonas esclavas
+
+En `named.conf.local` del secundario declaro las dos zonas como esclavas e indico la IP del primario en `masters`. No creo los ficheros de zona: el primario los transfiere y Bind los guarda en `/var/cache/bind`.
+
+```
+zone "bea.test" {
+  type slave;
+  masters { 192.168.56.10; };
+  file "/var/cache/bind/bea.test.dns";
+};
+
+zone "56.168.192.in-addr.arpa" {
+  type slave;
+  masters { 192.168.56.10; };
+  file "/var/cache/bind/bea.test.rev";
+};
+```
+
+![local secundario](img/secundario-local.png)
+
+Valido la configuración y reinicio el servicio:
+
+```
+sudo named-checkconf
+sudo systemctl restart named
+systemctl status named
+```
+
+![reinicio secundario](img/secundario-restart.png)
+
+### 8.6. Comprobar la transferencia y la resolución
+
+En el registro del secundario se ve que las dos zonas se han transferido correctamente:
+
+```
+sudo journalctl -u named --since "10 minutes ago" --no-pager | grep -i transfer
+```
+
+![log secundario](img/secundario-log.png)
+
+Desde el primario, que hace de cliente, consulto directamente al secundario:
+
+```
+dig @192.168.56.11 bea.test SOA +norecurse
+dig @192.168.56.11 debian.bea.test A +short
+dig @192.168.56.11 -x 192.168.56.10 +short
+```
+
+![dig secundario](img/secundario-dig.png)
+
+La consulta SOA devuelve respuesta autoritativa (`aa`) y las consultas directa e inversa devuelven los registros configurados. Compruebo que el número de serie es el mismo en los dos servidores:
+
+```
+dig @192.168.56.10 bea.test SOA +short
+dig @192.168.56.11 bea.test SOA +short
+```
+
+![serial](img/serial.png)
