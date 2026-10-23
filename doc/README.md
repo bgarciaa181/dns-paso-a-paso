@@ -277,13 +277,18 @@ I also check it from my own computer:
 
 ![nslookup from the pc](img/nslookup-pc.png)
 
-## 7. Tareas de ampliación y comprobación
+## 7. Extra tasks and checks
 
-### 7.1. Ampliación de registros en la zona
+### 7.1. More records in the zone
 
-Añado a la zona un alias y un registro de texto, y subo el serial a 2026102302 para indicar que la zona ha cambiado:
+I add an alias and a text record to the zone. I also raise the serial number to 2026102302, so the servers know that the zone changed:
 
-La zona completa queda así:
+```
+web.bea.test.    IN      CNAME   debian.bea.test.
+@                IN      TXT     "bgarciaa181"
+```
+
+The complete zone file looks like this:
 
 ```
 ;
@@ -303,9 +308,9 @@ web.bea.test.    IN      CNAME   debian.bea.test.
 @                IN      TXT     "bgarciaa181"
 ```
 
-#### 7.1.1. Registro CNAME
+#### 7.1.1. CNAME record
 
-El alias `web.bea.test` apunta al nombre canónico `debian.bea.test`:
+The alias `web.bea.test` points to the real name `debian.bea.test`:
 
 ```
 dig @192.168.56.10 web.bea.test CNAME +short
@@ -314,9 +319,9 @@ nslookup -type=cname web.bea.test 192.168.56.10
 
 ![cname](img/cname.png)
 
-#### 7.1.2. Registro descriptivo TXT
+#### 7.1.2. TXT record
 
-Añado en la raíz de la zona un registro TXT con mi usuario de GitHub:
+I add a TXT record at the root of the zone with my GitHub user:
 
 ```
 dig @192.168.56.10 bea.test TXT +short
@@ -325,9 +330,9 @@ nslookup -type=txt bea.test 192.168.56.10
 
 ![txt](img/txt.png)
 
-#### 7.1.3. Registro de resolución inversa PTR
+#### 7.1.3. PTR record (reverse resolution)
 
-Compruebo que la IP del servidor resuelve a su nombre de dominio completo:
+I check that the IP of the server gives back its full name:
 
 ```
 dig @192.168.56.10 -x 192.168.56.10 +short
@@ -336,9 +341,9 @@ nslookup 192.168.56.10 192.168.56.10
 
 ![ptr](img/ptr.png)
 
-#### 7.1.4. Comprobación de autoridad (flag aa)
+#### 7.1.4. Checking the authority (flag aa)
 
-Consulto mi dominio local y un dominio externo:
+I ask about my own domain and about an external domain:
 
 ```
 dig @192.168.56.10 debian.bea.test | grep flags
@@ -347,11 +352,11 @@ dig @192.168.56.10 www.google.es | grep flags
 
 ![aa](img/aa.png)
 
-El flag `aa` aparece con mi dominio porque mi servidor es el maestro de la zona `bea.test` y responde con autoridad, y no aparece con `www.google.es` porque mi servidor solo resuelve esa consulta de forma recursiva con datos de otros servidores.
+The flag `aa` appears with my domain because my server is the master of the zone `bea.test`, so it answers with its own data. It does not appear with `www.google.es` because my server asks other servers to get that answer.
 
-### 7.2. Script de autocomprobación (test.sh)
+### 7.2. Check script (test.sh)
 
-Creo el script `test.sh` en el directorio raíz del repositorio, con permisos de ejecución, para automatizar la verificación del servidor. Comprueba la sintaxis de los ficheros de configuración y las zonas, y hace consultas de resolución. Más adelante lo ejecutará el último script de provisión de Vagrant.
+I create the script `test.sh` in the main folder of the repository, with permission to run. It checks the server automatically. It checks the syntax of the configuration files and the zones, and then it asks some questions to the DNS server. Later, the last provision script of Vagrant will run it.
 
 ```
 #!/usr/bin/env bash
@@ -366,7 +371,7 @@ dig @localhost bea.test TXT +short
 dig @localhost -x 192.168.56.10 +short
 ```
 
-Lo ejecuto dentro de la máquina:
+I run it inside the machine:
 
 ```
 bash /vagrant/test.sh
