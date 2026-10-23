@@ -1,10 +1,10 @@
-# Práctica: servidor DNS paso a paso
+# Practice: DNS server step by step
 
-## 1. Máquina virtual con Vagrant
+## 1. Virtual machine with Vagrant
 
-Creo el Vagrantfile con la máquina del servidor.
-Tiene una tarjeta de red privada en la red 192.168.56.0/24 y su IP es 192.168.56.10.
-Uso la box de Debian `debian/bookworm64`. El Vagrantfile queda así:
+I create a Vagrantfile for the server machine. It has a private network card in the network 192.168.56.0/24, and its IP is 192.168.56.10. The address .1 is not free, because my own computer uses it.
+
+I use the Debian box `debian/bookworm64`. The Vagrantfile looks like this:
 
 ```ruby
 Vagrant.configure("2") do |config|
@@ -16,7 +16,7 @@ Vagrant.configure("2") do |config|
 end
 ```
 
-Arranco la máquina:
+I start the machine:
 
 ```
 vagrant up servidor
@@ -24,7 +24,7 @@ vagrant up servidor
 
 ![vagrant up](img/vagrant-up.png)
 
-Entro en la máquina y compruebo su IP:
+Then I enter the machine and check its IP:
 
 ```
 vagrant ssh servidor
@@ -33,9 +33,9 @@ ip a
 
 ![ip a](img/ip-a.png)
 
-## 2. Comprobación del fichero hosts
+## 2. Checking the hosts file
 
-Antes de empezar compruebo que el fichero hosts de mi equipo no tiene entradas añadidas, para que vayan de verdad al servidor DNS.
+Before I start, I check that the hosts file of my computer has no extra lines. If it has, the names could be solved without using my DNS server, and the tests would not be real.
 
 ```
 Get-Content C:\Windows\System32\drivers\etc\hosts
@@ -43,9 +43,9 @@ Get-Content C:\Windows\System32\drivers\etc\hosts
 
 ![hosts](img/hosts.png)
 
-## 3. Instalación del servidor DNS
+## 3. Installing the DNS server
 
-Bind es el servidor DNS que se usa como estándar y también se le conoce como named. Lo instalo desde los repositorios oficiales con los paquetes bind9, bind9utils y bind9-doc. Añado dnsutils para tener dig y nslookup.
+Bind is the most used DNS server. It is also called named. I install it from the official repositories with the packages bind9, bind9utils and bind9-doc. I also install dnsutils, because it has the commands dig and nslookup.
 
 ```
 sudo apt update
@@ -54,7 +54,7 @@ sudo apt install -y bind9 bind9utils bind9-doc dnsutils
 
 ![instalacion](img/instalacion.png)
 
-Compruebo que el servicio está activo:
+I check that the service is running:
 
 ```
 systemctl status named
@@ -62,11 +62,11 @@ systemctl status named
 
 ![status](img/status.png)
 
-## 4. Configuración del servidor
+## 4. Server configuration
 
-### Solo IPv4
+### IPv4 only
 
-En clase solo vamos a usar IPv4, así que se lo indico a Bind en `/etc/default/named`:
+In class we only use IPv4, so I tell Bind this in the file `/etc/default/named`:
 
 ```
 OPTIONS="-u bind -4"
@@ -74,17 +74,17 @@ OPTIONS="-u bind -4"
 
 ![default named](img/default-named.png)
 
-Al principio el fichero se copió vacío y Bind arrancaba sin las opciones (en `systemctl status named` salía solo `named -f`). Al corregirlo, arranca con `named -f -u bind -4`.
+At the beginning the file was empty when I copied it, so Bind started without these options (`systemctl status named` only showed `named -f`). I fixed it, and now Bind starts with `named -f -u bind -4`.
 
-### 4.1. Fichero named.conf.options
+### 4.1. File named.conf.options
 
-Antes de modificarlo hago una copia de seguridad:
+Before I change it, I make a backup copy:
 
 ```
 sudo cp /etc/bind/named.conf.options /etc/bind/named.conf.options.backup
 ```
 
-Añado una lista de acceso (`confiables`) para que solo puedan hacer consultas recursivas los hosts de confianza: el propio servidor y la red 192.168.56.0/24. El fichero queda así:
+I add an access list called `confiables` (trusted). Only these computers can ask recursive questions: the server itself and the network 192.168.56.0/24. The file looks like this:
 
 ```
 acl confiables {
@@ -114,16 +114,16 @@ options {
 
 ![named.conf.options](img/named-conf-options.png)
 
-Qué hace cada parte:
+What each part does:
 
-- `directory`: es donde Bind guarda la caché (/var/cache/bind). Por defecto ya funciona como DNS caché.
-- `allow-transfer { none; }`: no se permite transferir zonas a nadie, de momento.
-- `listen-on port 53`: el servidor escucha en el puerto 53 en localhost y en la IP de su tarjeta de red privada.
-- `recursion yes` y `allow-recursion { confiables; }`: permito consultas recursivas, pero solo a los hosts de la lista de acceso.
-- `dnssec-validation yes`: activa la validación de DNSSEC.
-- `listen-on-v6` está comentada porque no vamos a responder consultas IPv6.
+- `directory`: the place where Bind keeps its cache (/var/cache/bind). By default it already works as a cache DNS.
+- `allow-transfer { none; }`: nobody can copy the zones, for now.
+- `listen-on port 53`: the server listens on port 53 on localhost and on the IP of its private network card.
+- `recursion yes` and `allow-recursion { confiables; }`: the server can answer recursive questions (it asks other servers to find the answer), but only for the computers in the list.
+- `dnssec-validation yes`: turns on DNSSEC, a security check for DNS answers.
+- `listen-on-v6` is a comment, because we do not answer IPv6 questions.
 
-Compruebo que la configuración es correcta, reinicio el servicio y miro su estado:
+I check the configuration, restart the service and look at its state:
 
 ```
 named-checkconf /etc/bind/named.conf.options
@@ -132,21 +132,6 @@ systemctl status named
 ```
 
 ![comprobacion](img/checkconf-status.png)
-
-### 4.2. Fichero named.conf.local
-
-En este fichero declaro la zona `bea.test`. Indico que mi servidor DNS es el maestro de la zona y dónde estará su archivo de zona. Antes hago una copia de seguridad:
-
-```
-sudo cp /etc/bind/named.conf.local /etc/bind/named.conf.local.backup
-```
-
-```
-zone "bea.test" {
-     type master;
-     file "/var/lib/bind/bea.test.dns";
-};
-```
 
 ### 4.3. Archivo de zona de resolución directa
 
